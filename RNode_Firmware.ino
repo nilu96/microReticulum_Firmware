@@ -233,7 +233,7 @@ RNS::Interface lora_interface(RNS::Type::NONE);
 #if defined(RNS_USE_FS)
   // CBA microStore
   #if MCU_VARIANT == MCU_ESP32
-    #if defined(USTORE_USE_SD)
+    #if defined(HAS_SDCARD)
       #include <microStore/Adapters/SDFileSystem.h>
       microStore::FileSystem filesystem{microStore::Adapters::SDFileSystem(SDCARD_SCLK, SDCARD_MISO, SDCARD_MOSI, SDCARD_CS)};
     #else
@@ -246,13 +246,16 @@ RNS::Interface lora_interface(RNS::Type::NONE);
     #endif
   #elif MCU_VARIANT == MCU_NRF52
     #include <microStore/Adapters/InternalFSFileSystem.h>
-    #include <microStore/Adapters/FlashFSFileSystem.h>
+    #if DBOARD_MODEL == BOARD_RAK4631
+      #include <microStore/Adapters/FlashFSFileSystem.h>
+    #endif
     microStore::FileSystem filesystem;
   #else
     #include <microStore/Adapters/PosixFileSystem.h>
     microStore::FileSystem filesystem{microStore::Adapters::PosixFileSystem()};
   #endif
   #else // RNS_USE_FS
+    #include <microStore/Adapters/NoopFileSystem.h>
     microStore::FileSystem filesystem{microStore::Adapters::NoopFileSystem()};
   #endif // RNS_USE_FS
 #endif  // HAS_RNS
@@ -599,7 +602,7 @@ void setup() {
   try {
     // CBA Init filesystem
     HEAD("Initializing filesystem...", RNS::LOG_TRACE);
-#if MCU_VARIANT == MCU_NRF52
+#if defined(RNS_USE_FS) && DBOARD_MODEL == BOARD_RAK4631
     // First attempt to initialize RAK15001 flash
     TRACE("Looking for RAK15001 flash...");
     static const SPIFlash_Device_t device_rak15001 = RAK15001;
@@ -618,6 +621,11 @@ void setup() {
       filesystem.init();
       TRACE("Initialized internal flash");
     }
+#elif defined(RNS_USE_FS) && MCU_VARIANT == MCU_NRF52
+    TRACE("Using internal flash...");
+    filesystem = microStore::Adapters::InternalFSFileSystem();
+    filesystem.init();
+    TRACE("Initialized internal flash");
 #else
     filesystem.init();
 #endif
