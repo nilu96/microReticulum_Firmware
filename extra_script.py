@@ -95,6 +95,8 @@ def device_provision(env):
             env.Execute("rnodeconf --product 10 --model 12 --hwrev 1 --rom " + env.subst("$UPLOAD_PORT"))
         case "heltec_t114" | "heltec_t114_local":
             env.Execute("rnodeconf --product c2 --model c7 --hwrev 1 --rom " + env.subst("$UPLOAD_PORT"))
+        case "heltec_t096" | "heltec_t096_local":
+            env.Execute("rnodeconf --product d1 --model d5 --hwrev 1 --rom " + env.subst("$UPLOAD_PORT"))
         case _:
             print(f"Unknown board variant {variant}, can not provision device!")
 
