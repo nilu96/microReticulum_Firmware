@@ -1,4 +1,4 @@
-// Copyright (C) 2024, Mark Qvist
+// Copyright (C) 2024-2026, Mark Qvist and Chad Attermann
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -17,17 +17,23 @@
 #ifdef HAS_RNS
 #include <Transport.h>
 #include <Reticulum.h>
+#include <Identity.h>
 #include <Interface.h>
 #include <Log.h>
 #include <Bytes.h>
 #endif
+//#include "LoRaInterface.h"
 #if defined(UDP_TRANSPORT)
 #include "UDPInterface.h"
+#endif
+#ifdef URTN_STATS_PAGES
+#include "Pages.h"
 #endif
 
 #include <Arduino.h>
 #include <SPI.h>
 #include "Utilities.h"
+#include "DeviceUID.h"
 
 // CBA SD
 #if HAS_SDCARD
@@ -95,6 +101,7 @@ public:
 		_IN = true;
 		_OUT = true;
 		_HW_MTU = 508;
+    _bitrate = lora_bitrate;
 	}
 	LoRaInterface() : LoRaInterface("LoRaInterface") {}
 	virtual ~LoRaInterface() {
@@ -114,7 +121,7 @@ protected:
       ERRORF("LoRaInterface::handle_incoming: %s", e.what());
     }
   }
-	virtual void send_outgoing(const RNS::Bytes& data) {
+	virtual bool send_outgoing(const RNS::Bytes& data) {
     // CBA NOTE header will be addded later by transmit function
     TRACEF("LoRaInterface.send_outgoing: (%u bytes) data: %s", data.size(), data.toHex().c_str());
     try {
@@ -152,13 +159,15 @@ protected:
     }
     catch (const std::bad_alloc&) {
       ERROR("LoRaInterface::send_outgoing: bad_alloc - out of memory");
+      return false;
     }
     catch (std::exception& e) {
       ERRORF("LoRaInterface::send_outgoing: %s", e.what());
+      return false;
     }
+    return true;
   }
 };
-
 // CBA logger callback
 void on_log(const char* msg, RNS::LogLevel level) {
   // Using individual Serial.print statements to avoid memory allocation for String
@@ -230,6 +239,9 @@ void on_transmit_packet(const RNS::Bytes& raw, const RNS::Interface& interface) 
 // CBA RNS
 RNS::Reticulum reticulum(RNS::Type::NONE);
 RNS::Interface lora_interface(RNS::Type::NONE);
+#if defined(UDP_TRANSPORT)
+RNS::Interface udp_interface(RNS::Type::NONE);
+#endif
 #if defined(RNS_USE_FS)
   // CBA microStore
   #if MCU_VARIANT == MCU_ESP32
@@ -293,6 +305,9 @@ void setup() {
 	printf("Total PSRAM: %7u bytes\n", ESP.getPsramSize());
 #endif
 	//printf("Total flash: %zu bytes\n", RNS::Utilities::OS::storage_size());
+
+  device_uid_init();
+  printf("Device UID:  %s\n", device_uid_str);
 
   // Configure WDT
   #if MCU_VARIANT == MCU_ESP32
@@ -698,11 +713,13 @@ void setup() {
       TRACEF("LoRaInterface hash: %s", lora_interface.get_hash().toHex().c_str());
 
 #if HAS_WIFI && defined(UDP_TRANSPORT)
-      HEAD("Registering UDP Interface...", RNS::LOG_TRACE);
-      udp_interface = new UDPInterface();
-      udp_interface.mode(RNS::Type::Interface::MODE_GATEWAY);
-      RNS::Transport::register_interface(udp_interface);
-      TRACEF("UDPInterface hash: %s", udp_interface.get_hash().toHex().c_str());
+      if (wifi_mode != WR_WIFI_OFF) {
+        HEAD("Registering UDP Interface...", RNS::LOG_TRACE);
+        udp_interface = new UDPInterface();
+        udp_interface.mode(RNS::Type::Interface::MODE_GATEWAY);
+        RNS::Transport::register_interface(udp_interface);
+        TRACEF("UDPInterface hash: %s", udp_interface.get_hash().toHex().c_str());
+      }
 #endif
 
       HEAD("Creating Reticulum instance...", RNS::LOG_TRACE);
@@ -733,6 +750,47 @@ void setup() {
       RNS::Destination destination(identity, RNS::Type::Destination::IN, RNS::Type::Destination::SINGLE, "rnstransport", "local");
 #endif
       RNS::Destination destination(RNS::Transport::identity(), RNS::Type::Destination::IN, RNS::Type::Destination::SINGLE, "rnstransport", "local");
+
+#ifdef URTN_STATS_PAGES
+      // Create an IN/SINGLE destination on the NomadNet aspect, so
+      // clients (this example, or a Python NomadNet browser) can find
+      // us by aspect/announce and open a Link.
+      RNS::Destination stats_destination = RNS::Destination(
+        RNS::Transport::identity(),
+        RNS::Type::Destination::IN,
+        RNS::Type::Destination::SINGLE,
+        "nomadnetwork",
+        "node"
+      );
+/*
+      RNS::Destination stats_destination = RNS::Destination(
+        RNS::Transport::identity(),
+        RNS::Type::Destination::IN,
+        RNS::Type::Destination::SINGLE,
+        "rnstransport",
+        "remote.management"
+      );
+*/
+
+      // Register the page handler. ALLOW_ALL because page browsing is open
+      // to anyone who can reach the node, just like a Python NomadNet
+      // node's default policy.
+      stats_destination.register_request_handler("/page/index.mu", serve_page, RNS::Type::Destination::ALLOW_ALL);
+      stats_destination.register_request_handler("/page/stack.mu", serve_page, RNS::Type::Destination::ALLOW_ALL);
+      stats_destination.register_request_handler("/page/device.mu", serve_page, RNS::Type::Destination::ALLOW_ALL);
+
+      // Announce once at startup so a client that's already listening can
+      // discover us immediately. The node name is sent as the announce
+      // app_data (plain UTF-8 bytes), matching nomadnet/Node.py:217-222 —
+      // this is what other NomadNet clients show in their site listing.
+      {
+        char stats_announce_data[64];
+        snprintf(stats_announce_data, sizeof(stats_announce_data),
+                "microReticulum Node [%s]", device_uid_str);
+        TRACEF("Announcing NomadNet pages \"%s\" at destination %s", stats_announce_data, stats_destination.hash().toHex().c_str());
+        stats_destination.announce(stats_announce_data);
+      }
+#endif // URTN_STATS_PAGES
 
       HEAD("RNS is READY!", RNS::LOG_TRACE);
       if (op_mode == MODE_TNC) {

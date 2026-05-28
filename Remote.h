@@ -52,7 +52,7 @@ wl_status_t wr_wifi_status = WL_IDLE_STATUS;
 WiFiUDP udp;
 RNS::Bytes udp_buffer;
 #if defined(HAS_RNS)
-RNS::Interface udp_interface(RNS::Type::NONE);
+extern RNS::Interface udp_interface;
 #endif
 #endif
 
@@ -63,6 +63,7 @@ bool wifi_initialized = false;
 char wr_ssid[33];
 char wr_psk[33];
 
+extern uint16_t udp_port;
 extern void host_disconnected();
 
 void wifi_dbg(String msg) { Serial.print("[WiFi] "); Serial.println(msg); }
@@ -105,10 +106,19 @@ void wifi_remote_start_sta() {
     WiFi.config(sta_ip, sta_ip, sta_nm);
   }
 
+  WiFi.setMinSecurity(WIFI_AUTH_WPA2_PSK);
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+  WiFi.setPmf(true, false);   // capable, not required
+#endif
+
+  //WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+  //  Serial.printf("[WiFi] event=%d\n", event);
+  //});
+
   delay(100);
-  //Serial.print("WiFi ssid: ");
-  //Serial.println(wr_ssid);
-  //Serial.print("WiFi psk: ");
+  Serial.print("[WiFi] ssid: ");
+  Serial.println(wr_ssid);
+  //Serial.print("[WiFi] psk: ");
   //Serial.println(wr_psk);
   if (wr_ssid[0] != 0x00) {
     if (wr_psk[0] != 0x00) { WiFi.begin(wr_ssid, wr_psk); }
@@ -118,8 +128,10 @@ void wifi_remote_start_sta() {
   delay(500);
   //delay(10000);
   wr_wifi_status = WiFi.status(); 
-  //Serial.print("WiFi status: ");
+  //Serial.print("[WiFi] status: ");
   //Serial.println(wr_wifi_status);
+	//Serial.print("[WiFi] ip: ");
+	//Serial.println(WiFi.localIP());
   wifi_initialized = true;
   wr_last_connect_try = millis();
 }
@@ -141,7 +153,7 @@ void wifi_remote_start() {
     remote_listener.setTimeout(WR_SOCKET_TIMEOUT);
     wr_state = WR_STATE_ON;
 #if defined(UDP_TRANSPORT)
-    udp.begin(UDP_PORT);
+    udp.begin(udp_port);
 #endif
   } else {
     remote_listener.end();
@@ -226,7 +238,13 @@ void wifi_remote_write(uint8_t byte) { if (connection) { connection.write(byte);
 
 void wifi_update_status() {
   wr_wifi_status = WiFi.status();
-  if (wr_wifi_status == WL_CONNECTED) { wr_device_ip = WiFi.localIP(); }
+  //Serial.print("[WiFi] status: ");
+  //Serial.println(wr_wifi_status);
+  if (wr_wifi_status == WL_CONNECTED) {
+    wr_device_ip = WiFi.localIP();
+    //Serial.print("[WiFi] ip: ");
+    //Serial.println(WiFi.localIP());
+  }
   if (wifi_mode == WR_WIFI_AP && wifi_initialized) { wr_device_ip = WiFi.softAPIP(); wr_wifi_status = WL_CONNECTED; }
   if (wifi_init_ran && wifi_mode == WR_WIFI_STA && wr_wifi_status != WL_CONNECTED) {
     if (millis()-wr_last_connect_try >= WR_RECONNECT_INTERVAL_MS) { wifi_remote_init(); }
