@@ -114,6 +114,19 @@ static const uint8_t SCK1  = PIN_SPI1_SCK;
 #define PIN_WIRE_SDA         (13)
 #define PIN_WIRE_SCL         (16)
 
+// ------------------------------------------------------------------
+// QSPI External Flash Storage - Wired to P2 Header (Pins 13-18)
+// ------------------------------------------------------------------
+#define EXTERNAL_FLASH_DEVICES W25Q128JV_SQ
+#define EXTERNAL_FLASH_USE_QSPI
+
+#define PIN_QSPI_CS          (35) // P2 Pin 13 (P1.03)
+#define PIN_QSPI_SCK         (37) // P2 Pin 14 (P1.05)
+#define PIN_QSPI_IO0         (39) // P2 Pin 15 (P1.07)
+#define PIN_QSPI_IO1         (38) // P2 Pin 16 (P1.06)
+#define PIN_QSPI_IO2         (34) // P2 Pin 17 (P1.02)
+#define PIN_QSPI_IO3         (36) // P2 Pin 18 (P1.04)
+
 #ifdef __cplusplus
 }
 #endif
