@@ -260,6 +260,8 @@ RNS::Interface udp_interface(RNS::Type::NONE);
     #include <microStore/Adapters/InternalFSFileSystem.h>
     #if DBOARD_MODEL == BOARD_RAK4631
       #include <microStore/Adapters/FlashFSFileSystem.h>
+    #elif defined(DHAS_QSPI_EXTERNAL_FLASH)
+      #include <microStore/Adapters/AdafruitQspiLittleFSFileSystem.h>
     #endif
     microStore::FileSystem filesystem;
   #else
@@ -617,30 +619,49 @@ void setup() {
   try {
     // CBA Init filesystem
     HEAD("Initializing filesystem...", RNS::LOG_TRACE);
-#if defined(RNS_USE_FS) && DBOARD_MODEL == BOARD_RAK4631
-    // First attempt to initialize RAK15001 flash
-    TRACE("Looking for RAK15001 flash...");
-    static const SPIFlash_Device_t device_rak15001 = RAK15001;
-    filesystem = microStore::Adapters::FlashFSFileSystem(&device_rak15001);
-    if (filesystem.init()) {
-      TRACE("Initialized RAK15001 flash");
-      // Raise path store limits to account for larger external flash size
-      RNS::Transport::path_table_maxsize(500);
-      RNS::Transport::path_store_segment_size(24576);
-      RNS::Transport::path_store_segment_count(8);
-    }
-    else {
-      // Finaly attempt to initialize internl flash
-      TRACE("Using internal flash...");
-      filesystem = microStore::Adapters::InternalFSFileSystem();
-      filesystem.init();
-      TRACE("Initialized internal flash");
-    }
-#elif defined(RNS_USE_FS) && MCU_VARIANT == MCU_NRF52
-    TRACE("Using internal flash...");
-    filesystem = microStore::Adapters::InternalFSFileSystem();
-    filesystem.init();
-    TRACE("Initialized internal flash");
+#if defined(RNS_USE_FS)
+    #if DBOARD_MODEL == BOARD_RAK4631
+      // First attempt to initialize RAK15001 flash
+      TRACE("Looking for RAK15001 flash...");
+      static const SPIFlash_Device_t device_rak15001 = RAK15001;
+      filesystem = microStore::Adapters::FlashFSFileSystem(&device_rak15001);
+      if (filesystem.init()) {
+        TRACE("Initialized RAK15001 flash");
+        // Raise path store limits to account for larger external flash size
+        RNS::Transport::path_table_maxsize(500);
+        RNS::Transport::path_store_segment_size(24576);
+        RNS::Transport::path_store_segment_count(8);
+      }
+    #elif defined(HAS_QSPI_EXTERNAL_FLASH) && DPLATFORM == PLATFORM_NRF52
+      // First attempt to initialize external QSPI flash
+      TRACE("Looking for external flash...");
+      filesystem = microStore::Adapters::AdafruitQspiLittleFSFileSystem(
+          PIN_QSPI_SCK, 
+          PIN_QSPI_CS, 
+          PIN_QSPI_IO0, 
+          PIN_QSPI_IO1, 
+          PIN_QSPI_IO2, 
+          PIN_QSPI_IO3
+      );
+
+      if (filesystem.init()) {
+        TRACE("Initialized external flash");
+
+        // Raise path store limits to account for larger external flash size
+        RNS::Transport::path_table_maxsize(500);
+        RNS::Transport::path_store_segment_size(24576);
+        RNS::Transport::path_store_segment_count(8);
+      }
+    #else
+      if (false) {}
+    #endif
+      else {
+        // Finaly attempt to initialize internl flash
+        TRACE("Using internal flash...");
+        filesystem = microStore::Adapters::InternalFSFileSystem();
+        filesystem.init();
+        TRACE("Initialized internal flash");
+      }
 #else
     filesystem.init();
 #endif
