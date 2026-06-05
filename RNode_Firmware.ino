@@ -260,8 +260,8 @@ RNS::Interface udp_interface(RNS::Type::NONE);
     #include <microStore/Adapters/InternalFSFileSystem.h>
     #if DBOARD_MODEL == BOARD_RAK4631
       #include <microStore/Adapters/FlashFSFileSystem.h>
-    #elif defined(DHAS_QSPI_EXTERNAL_FLASH)
-      #include <microStore/Adapters/AdafruitQspiLittleFSFileSystem.h>
+    #elif defined(EXTERNAL_FLASH_USE_QSPI)
+      #include <microStore/Adapters/FlashFSFileSystem.h>
     #endif
     microStore::FileSystem filesystem;
   #else
@@ -632,17 +632,10 @@ void setup() {
         RNS::Transport::path_store_segment_size(24576);
         RNS::Transport::path_store_segment_count(8);
       }
-    #elif defined(HAS_QSPI_EXTERNAL_FLASH) && DPLATFORM == PLATFORM_NRF52
+    #elif MCU_VARIANT == MCU_NRF52 && defined(EXTERNAL_FLASH_USE_QSPI)
       // First attempt to initialize external QSPI flash
       TRACE("Looking for external flash...");
-      filesystem = microStore::Adapters::AdafruitQspiLittleFSFileSystem(
-          PIN_QSPI_SCK, 
-          PIN_QSPI_CS, 
-          PIN_QSPI_IO0, 
-          PIN_QSPI_IO1, 
-          PIN_QSPI_IO2, 
-          PIN_QSPI_IO3
-      );
+      filesystem = microStore::Adapters::FlashFSFileSystem(nullptr);
 
       if (filesystem.init()) {
         TRACE("Initialized external flash");
