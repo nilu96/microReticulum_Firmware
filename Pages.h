@@ -197,7 +197,7 @@ RNS::Bytes serve_page(
         content << "  \"control_destinations\": " << std::to_string(RNS::Transport::control_destinations().size()) << ",\n";
         content << "  \"control_hashes\": " << std::to_string(RNS::Transport::control_hashes().size()) << ",\n";
 
-        content << "  \"packet_hashes\": " << std::to_string(RNS::Transport::packet_hashlist_size()) << ",\n";
+        content << "  \"packet_hashes\": " << std::to_string(RNS::Transport::packet_hashlist().size()) << ",\n";
         content << "  \"reverse_hashes\": " << std::to_string(RNS::Transport::reverse_table().size()) << ",\n";
         content << "  \"receipts\": " << std::to_string(RNS::Transport::receipts().size()) << ",\n";
 
