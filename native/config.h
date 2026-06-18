@@ -1,4 +1,4 @@
-// Copyright (C) 2026, microReticulum_Firmware contributors
+// Copyright (C) 2026, Chad Attermann
 //
 // Native-build runtime configuration. Loaded once at startup from a key=value
 // text file (default: ./rnoded.conf). All values have sensible
@@ -96,6 +96,11 @@ struct Config {
     // no auth/encryption, so the daemon should only be reachable across a
     // network you trust. Turning this on is the explicit way to opt in.
     bool     kiss_tcp_public = false;
+
+    // Bind the KISS-over-WebSocket server on all interfaces (0.0.0.0)
+    // instead of just 127.0.0.1. Same caveats as kiss_tcp_public — no
+    // auth or encryption — so only opt in on networks you trust.
+    bool     kiss_ws_public  = false;
 };
 
 extern Config g_config;
