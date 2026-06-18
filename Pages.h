@@ -19,10 +19,10 @@
 
 #include "Config.h"
 
-#include <Interface.h>
-#include <Identity.h>
-#include <Utilities/OS.h>
-#include <Bytes.h>
+#include <microReticulum/Interface.h>
+#include <microReticulum/Identity.h>
+#include <microReticulum/Utilities/OS.h>
+#include <microReticulum/Bytes.h>
 // CBA NOTE Thge following <MsgPack.h> include *MUST* precede the "Utilities.h" include
 #include <MsgPack.h>
 
@@ -36,6 +36,7 @@ extern uint16_t udp_port;
 extern uint8_t wifi_mode;
 extern char wr_ssid[];
 #endif
+extern RNS::Destination nomadnet_destination;
 
 void add_interface_details(RNS::Bytes& content, const RNS::Interface& interface) {
   content << "    \"mode\": \"";
@@ -107,12 +108,12 @@ RNS::Bytes serve_page(
 		}
 	}
 
-	NOTICEF("Serving %s with category \"%s\" to link <%s>", path.toString().c_str(), category.c_str(), link_id.toHex().c_str());
+	VERBOSEF("Serving page %s with category \"%s\" to link <%s> with identity <%s>", path.toString().c_str(), category.c_str(), link_id.toHex().c_str(), (remote_identity ? remote_identity.hash().toHex().c_str() : RNS::Bytes{}.toHex().c_str()));
 	MsgPack::Packer packer;
   {
     RNS::Bytes content;
     if (path == "/page/index.mu") {
-      content = "> microReticulum Stats\n";
+      content = "> microReticulum Stats\n\n";
       content << ">> Memory\n";
       content << "`!`[• Heap Memory`:/page/stack.mu`c=heap]`\n";
       content << "`!`[• Memory Pools`:/page/stack.mu`c=pool]`\n";
@@ -123,7 +124,9 @@ RNS::Bytes serve_page(
       content << "`!`[• Transport Metrics`:/page/stack.mu`c=metrics]`\n";
       content << ">> Device\n";
       content << "`!`[• General`:/page/device.mu`c=general]`\n";
-      content << "`!`[• Interfaces`:/page/device.mu`c=interfaces]`\n";
+      content << "`!`[• Interface`:/page/device.mu`c=interfaces]`\n";
+      if (remote_identity) content << "\n🛡️ Verified identity: " << remote_identity.hash().toHex() << "\n";
+      else content << "\n⚠️ Unknown identity. Identity must be provided for access to this site.\n";
     }
     else if (path == "/page/stack.mu") {
   	  if (category == "heap") {
@@ -247,10 +250,15 @@ RNS::Bytes serve_page(
             break;
         }
         content << "\",\n";
+        content << "  \"transport_identity\": \"" << (RNS::Transport::identity() ? RNS::Transport::identity().hash().toHex() : RNS::Bytes{}.toHex()) << "\",\n";
+        content << "  \"probe_destination\": \"" << (RNS::Transport::probe_destination() ? RNS::Transport::probe_destination().hash().toHex() : RNS::Bytes{}.toHex()) << "\",\n";
+        content << "  \"mgmt_destination\": \"" << (RNS::Transport::remote_management_destination() ? RNS::Transport::remote_management_destination().hash().toHex() : RNS::Bytes{}.toHex()) << "\",\n";
+        content << "  \"nomadnet_destination\": \"" << (nomadnet_destination ? nomadnet_destination.hash().toHex() : RNS::Bytes{}.toHex()) << "\",\n";
       	content << "}";
       }
   	  else if (category == "interfaces") {
         content = "{\n";
+#if defined(LORA_TRANSPORT)
         content << "  \"" << lora_interface.name().c_str() << "\": {\n";
         content << "    \"frequency\": " << std::to_string(lora_freq) << ",\n";
         content << "    \"bandwidth\": " << std::to_string(lora_bw) << ",\n";
@@ -261,6 +269,7 @@ RNS::Bytes serve_page(
         content << "    \"current_snr\": " << std::to_string(last_snr_raw) << ",\n";
         add_interface_details(content, lora_interface);
       	content << "  },\n";
+#endif
 #if defined(UDP_TRANSPORT)
         if (wifi_mode != WR_WIFI_OFF && udp_interface) {
           content << "  \"" << udp_interface.name().c_str() << "\": {\n";
