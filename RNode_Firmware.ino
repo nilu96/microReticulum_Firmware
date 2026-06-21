@@ -893,7 +893,7 @@ void setup() {
       // CBA NOTE: All app-default-values must be set *before* calling init_provisioning so that they take effect for fresh installs
       HEAD("Initializing Provisioning subsystem...", RNS::LOG_TRACE);
       init_provisioning();
-      auto& prov = RNS::Provisioning::Manager::instance();
+      auto& prov = RNS::Provisioning::Provisioner::instance();
 #endif
 
       //reticulum.clear_caches();
@@ -986,9 +986,9 @@ void setup() {
         HEAD("RNS transport mode is ENABLED", RNS::LOG_TRACE);
         TRACEF("Frequency: %d Hz", lora_freq);
         TRACEF("Bandwidth: %d Hz", lora_bw);
-        TRACEF("TX Power: %d dBm", lora_txp);
         TRACEF("Spreading Factor: %d", lora_sf);
         TRACEF("Coding Rate: %d", lora_cr);
+        TRACEF("TX Power: %d dBm", lora_txp);
         HEAD("RNS Transport is READY!", RNS::LOG_TRACE);
       }
       else {
