@@ -847,9 +847,13 @@ void setup() {
     filesystem.format();
 #endif
 #if 1
-    printf("Listing filesystem /:\n");
+    TRACE("Listing filesystem /:");
     filesystem.listDirectory("/", [&](const char* path) -> void {
-      printf("  %s\n", path);
+      TRACEF("  %s", path);
+    });
+    TRACE("Listing filesystem /config/:");
+    filesystem.listDirectory("/config/", [&](const char* path) -> void {
+      TRACEF("  %s", path);
     });
 #endif
 #endif // !NDEBUG && RNS_USE_FS
@@ -945,7 +949,7 @@ void setup() {
       }
       RNS::Destination destination(identity, RNS::Type::Destination::IN, RNS::Type::Destination::SINGLE, "rnstransport", "local");
 #endif
-      RNS::Destination destination(RNS::Transport::identity(), RNS::Type::Destination::IN, RNS::Type::Destination::SINGLE, "rnstransport", "local");
+      //RNS::Destination destination(RNS::Transport::identity(), RNS::Type::Destination::IN, RNS::Type::Destination::SINGLE, "rnstransport", "local");
 
 #ifdef URTN_STATS_PAGES
       if (nomadnet_enabled) {
