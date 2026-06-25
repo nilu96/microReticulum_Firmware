@@ -803,10 +803,14 @@ void setup() {
       filesystem = microStore::Adapters::FlashFSFileSystem(&device_rak15001);
       if (filesystem.init()) {
         TRACE("Initialized RAK15001 flash");
+
         // Raise path store limits to account for larger external flash size
+        // if persistence of paths is enabled
+        #if RNS_PERSIST_PATHS
         RNS::Transport::path_table_maxsize(500);
         RNS::Transport::path_store_segment_size(24576);
         RNS::Transport::path_store_segment_count(8);
+        #endif
       }
     #elif MCU_VARIANT == MCU_NRF52 && defined(EXTERNAL_FLASH_USE_QSPI)
       // First attempt to initialize external QSPI flash
@@ -817,9 +821,12 @@ void setup() {
         TRACE("Initialized external flash");
 
         // Raise path store limits to account for larger external flash size
+        // if persistence of paths is enabled
+        #if RNS_PERSIST_PATHS
         RNS::Transport::path_table_maxsize(500);
         RNS::Transport::path_store_segment_size(24576);
         RNS::Transport::path_store_segment_count(8);
+        #endif
       }
     #else
       if (false) {}
